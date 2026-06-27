@@ -20,6 +20,9 @@ function saveConfig() {
 // تخزين بيانات التكتات
 const tickets = new Map();
 
+// عداد التكتات لكل سيرفر
+const ticketCounters = {};
+
 client.on('ready', async () => {
     console.log(`✅ البوت ${client.user.tag} متصل وجاهز!`);
 
@@ -119,13 +122,30 @@ client.on('interactionCreate', async (interaction) => {
             return await interaction.reply({ content: '❌ لم يتم إعداد نظام التكتات', ephemeral: true });
         }
 
+        // تحويل النوع للعربي
+        const categoryMap = {
+            'inquiry': 'استفسار',
+            'complaint': 'شكوى',
+            'rank_request': 'طلب رتبة'
+        };
+
         const category = interaction.values[0];
+        const categoryArabic = categoryMap[category] || category;
         const userId = interaction.user.id;
         const username = interaction.user.username;
         const createdAt = new Date().toLocaleString('ar-SA');
 
+        // إنشاء عداد التكتات إذا لم يكن موجود
+        if (!ticketCounters[guildId]) {
+            ticketCounters[guildId] = 1;
+        } else {
+            ticketCounters[guildId]++;
+        }
+
+        const ticketNumber = ticketCounters[guildId];
+
         const channel = await interaction.guild.channels.create({
-            name: `${category}-${username}`,
+            name: `ticket-${ticketNumber}`,
             type: ChannelType.GuildText,
             permissionOverwrites: [
                 { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
@@ -134,12 +154,18 @@ client.on('interactionCreate', async (interaction) => {
             ]
         });
 
+        // الحصول على بيانات الرول
+        const staffRole = await interaction.guild.roles.fetch(config.staffRoleId);
+        const roleDisplay = staffRole ? `${staffRole}` : `Role ID: ${config.staffRoleId}`;
+
         // حفظ بيانات التكت
         tickets.set(channel.id, {
             guildId: guildId,
+            ticketNumber: ticketNumber,
             owner: userId,
             claimed_by: null,
             category: category,
+            categoryArabic: categoryArabic,
             created_at: createdAt,
             closed: false,
             users: [userId]
@@ -155,8 +181,9 @@ client.on('interactionCreate', async (interaction) => {
             .setTitle('🎫 تكت جديد')
             .setDescription(`مرحباً ${interaction.user}، سيقوم أحد المشرفين بخدمتك قريباً.`)
             .addFields(
-                { name: '📝 نوع التكت', value: `${category}`, inline: true },
+                { name: '📝 نوع التكت', value: categoryArabic, inline: true },
                 { name: '👤 صاحب التكت', value: `${interaction.user.tag}`, inline: true },
+                { name: '👥 فريق الدعم', value: roleDisplay, inline: false },
                 { name: '⏰ الوقت', value: createdAt, inline: false }
             )
             .setColor(0x00FF00);
@@ -169,9 +196,11 @@ client.on('interactionCreate', async (interaction) => {
             const logEmbed = new EmbedBuilder()
                 .setTitle('🟢 تكت جديد')
                 .addFields(
+                    { name: 'رقم التكت', value: `#${ticketNumber}`, inline: true },
                     { name: 'صاحب التكت', value: `${interaction.user.tag}`, inline: true },
                     { name: 'القناة', value: `${channel}`, inline: true },
-                    { name: 'النوع', value: category, inline: true },
+                    { name: 'النوع', value: categoryArabic, inline: true },
+                    { name: 'فريق الدعم', value: roleDisplay, inline: true },
                     { name: 'الوقت', value: createdAt, inline: false }
                 )
                 .setColor(0x00FF00);
@@ -256,7 +285,9 @@ client.on('interactionCreate', async (interaction) => {
                 const logEmbed = new EmbedBuilder()
                     .setTitle('🔴 تكت تم إغلاقه')
                     .addFields(
+                        { name: 'رقم التكت', value: `#${ticketData.ticketNumber}`, inline: true },
                         { name: 'صاحب التكت', value: `<@${ticketData.owner}>`, inline: true },
+                        { name: 'النوع', value: ticketData.categoryArabic, inline: true },
                         { name: 'المستلم', value: ticketData.claimed_by ? `<@${ticketData.claimed_by}>` : 'لم يتم استلامه', inline: true },
                         { name: 'وقت الإنشاء', value: ticketData.created_at, inline: false },
                         { name: 'وقت الإغلاق', value: closedAt, inline: false }
