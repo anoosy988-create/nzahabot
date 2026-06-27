@@ -267,4 +267,9 @@ else if (commandName === 'mass-ban') {
 // ===== سيرفر HTTP لـ Render =====
 http.createServer((req, res) => res.end('Bot is running!')).listen(process.env.PORT || 3000);
 
-client.login(process.env.TOKEN);
+// ===== Keep Alive =====
+setInterval(() => {
+    fetch('https://bot-dragon.onrender.com').catch(() => {});
+}, 4 * 60 * 1000);
+
+client.login(TOKEN);
