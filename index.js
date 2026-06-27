@@ -2,8 +2,8 @@ const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, StringSelectM
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
-const STAFF_ROLE_ID = 'ضع_ايدي_رتبة_الستريتر_هنا';
-const LOGS_CHANNEL_ID = 'ضع_ايدي_روم_اللوقات_هنا';
+const STAFF_ROLE_ID = '1470410935587049555';
+const LOGS_CHANNEL_ID = '1520262915272216718';
 
 client.on('messageCreate', async (message) => {
     if (message.content === '!setup-tickets') {
