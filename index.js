@@ -101,6 +101,7 @@ client.on('interactionCreate', async (interaction) => {
                     { label: 'استفسار', value: 'inquiry' },
                     { label: 'شكوى', value: 'complaint' },
                     { label: 'طلب رتبة', value: 'rank_request' },
+                    { label: 'شراء', value: 'purchase' },
                 ])
         );
 
@@ -126,7 +127,8 @@ client.on('interactionCreate', async (interaction) => {
         const categoryMap = {
             'inquiry': 'استفسار',
             'complaint': 'شكوى',
-            'rank_request': 'طلب رتبة'
+            'rank_request': 'طلب رتبة',
+            'purchase': 'شراء'
         };
 
         const category = interaction.values[0];
@@ -186,9 +188,17 @@ client.on('interactionCreate', async (interaction) => {
                 { name: '👥 فريق الدعم', value: roleDisplay, inline: false },
                 { name: '⏰ الوقت', value: createdAt, inline: false }
             )
-            .setColor(0x00FF00);
+            .setColor(0x00FF00)
+            .setFooter({ text: `التكت رقم #${ticketNumber}` });
 
-        await channel.send({ embeds: [embed], components: [buttons] });
+        // إرسال منشن للمشرفين بدون اسم الرتبة
+        await channel.send(`<@&${config.staffRoleId}>`);
+        
+        // إرسال الرسالة الرئيسية
+        await channel.send({ 
+            embeds: [embed], 
+            components: [buttons] 
+        });
         
         // إرسال سجل
         const logsChannel = interaction.guild.channels.cache.get(config.logsChannelId);
