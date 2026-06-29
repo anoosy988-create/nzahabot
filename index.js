@@ -17,6 +17,11 @@ function saveConfig() {
     fs.writeFileSync(configFile, JSON.stringify(serverConfigs, null, 2));
 }
 
+// دالة التحقق من صلاحية Administrator
+function isAdmin(member) {
+    return member.permissions.has(PermissionsBitField.Flags.Administrator);
+}
+
 // تخزين بيانات التكتات
 const tickets = new Map();
 
@@ -108,6 +113,7 @@ client.on('ready', async () => {
 client.on('interactionCreate', async (interaction) => {
     // Setup Command
     if (interaction.isCommand() && interaction.commandName === 'setup-ticket') {
+        if (!isAdmin(interaction.member)) return await interaction.reply({ content: '❌ هذا الأمر يحتاج صلاحية Administrator', ephemeral: true });
         const guildId = interaction.guildId;
         const logsChannel = interaction.options.getChannel('logs_channel');
         const staffRole = interaction.options.getRole('staff_role');
@@ -181,6 +187,7 @@ client.on('interactionCreate', async (interaction) => {
 
     // ✅ أمر عرض الخيارات
     if (interaction.isCommand() && interaction.commandName === 'list-ticket-options') {
+        if (!isAdmin(interaction.member)) return await interaction.reply({ content: '❌ هذا الأمر يحتاج صلاحية Administrator', ephemeral: true });
         const guildId = interaction.guildId;
         const options = getTicketOptions(guildId);
 
@@ -222,6 +229,7 @@ client.on('interactionCreate', async (interaction) => {
 
     // Create Ticket Panel Command
     if (interaction.isCommand() && interaction.commandName === 'create-ticket-panel') {
+        if (!isAdmin(interaction.member)) return await interaction.reply({ content: '❌ هذا الأمر يحتاج صلاحية Administrator', ephemeral: true });
         const guildId = interaction.guildId;
         const config = serverConfigs[guildId];
 
@@ -350,8 +358,8 @@ client.on('interactionCreate', async (interaction) => {
         const config = serverConfigs[ticketData.guildId];
 
         if (interaction.customId === 'claim_ticket') {
-            if (!interaction.member.roles.cache.has(config.staffRoleId)) {
-                return await interaction.reply({ content: '❌ فقط المشرفون يمكنهم استلام التكتات', ephemeral: true });
+            if (!isAdmin(interaction.member)) {
+                return await interaction.reply({ content: '❌ فقط الأدمن يمكنهم استلام التكتات', ephemeral: true });
             }
 
             if (ticketData.claimed_by) {
@@ -376,8 +384,8 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         else if (interaction.customId === 'close_ticket') {
-            if (interaction.user.id !== ticketData.owner && !interaction.member.roles.cache.has(config.staffRoleId)) {
-                return await interaction.reply({ content: '❌ فقط صاحب التكت أو المشرفون يمكنهم إغلاق التكت', ephemeral: true });
+            if (interaction.user.id !== ticketData.owner && !isAdmin(interaction.member)) {
+                return await interaction.reply({ content: '❌ فقط صاحب التكت أو الأدمن يمكنهم إغلاق التكت', ephemeral: true });
             }
 
             if (interaction.user.id === ticketData.owner && ticketData.claimed_by) {
@@ -425,16 +433,16 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         else if (interaction.customId === 'add_user') {
-            if (!interaction.member.roles.cache.has(config.staffRoleId)) {
-                return await interaction.reply({ content: '❌ فقط المشرفون يمكنهم إضافة أشخاص', ephemeral: true });
+            if (!isAdmin(interaction.member)) {
+                return await interaction.reply({ content: '❌ فقط الأدمن يمكنهم إضافة أشخاص', ephemeral: true });
             }
 
             if (!ticketData.claimed_by) {
                 return await interaction.reply({ content: '❌ يجب استلام التكت أولاً قبل إضافة أشخاص', ephemeral: true });
             }
 
-            if (interaction.user.id !== ticketData.claimed_by) {
-                return await interaction.reply({ content: '❌ فقط المستلم يمكنه إضافة أشخاص', ephemeral: true });
+            if (interaction.user.id !== ticketData.claimed_by && !isAdmin(interaction.member)) {
+                return await interaction.reply({ content: '❌ فقط المستلم أو الأدمن يمكنه إضافة أشخاص', ephemeral: true });
             }
 
             const modal = new ModalBuilder()
@@ -470,4 +478,49 @@ client.on('interactionCreate', async (interaction) => {
                 if (members.size === 0) {
                     return await interaction.reply({ content: '❌ لم يتم العثور على المستخدم', ephemeral: true });
                 }
-                userId = members.first
+                userId = members.first()?.id;
+            }
+
+            const user = await client.users.fetch(userId);
+
+            if (ticketData.users.includes(userId)) {
+                return await interaction.reply({ content: '⚠️ هذا المستخدم مضاف بالفعل', ephemeral: true });
+            }
+
+            await interaction.channel.permissionOverwrites.create(userId, {
+                ViewChannel: true,
+                SendMessages: true,
+                ReadMessageHistory: true
+            });
+
+            ticketData.users.push(userId);
+
+            const embed = new EmbedBuilder()
+                .setTitle('✅ تم إضافة شخص')
+                .setDescription(`تم إضافة ${user.tag} للتكت`)
+                .setColor(0x00FF00);
+
+            await interaction.reply({ embeds: [embed] });
+
+            const dmEmbed = new EmbedBuilder()
+                .setTitle('📨 تمت إضافتك لتكت')
+                .setDescription(`تمت إضافتك لتكت جديد\n\n**القناة:** ${interaction.channel.name}\n**المضيف:** ${interaction.user.tag}`)
+                .setColor(0x00FF00);
+
+            await user.send({ embeds: [dmEmbed] }).catch(console.error);
+
+            const channelEmbed = new EmbedBuilder()
+                .setTitle('👤 تم إضافة عضو جديد')
+                .setDescription(`تمت إضافة ${user.tag} للتكت بواسطة ${interaction.user.tag}`)
+                .setColor(0x00FF00);
+
+            await interaction.channel.send({ embeds: [channelEmbed] });
+
+        } catch (error) {
+            console.error(error);
+            await interaction.reply({ content: '❌ حدث خطأ أثناء إضافة المستخدم', ephemeral: true });
+        }
+    }
+});
+
+client.login(process.env.TOKEN);
