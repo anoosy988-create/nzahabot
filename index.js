@@ -11,10 +11,10 @@ const tickets = new Map();
 const counters = {};
 
 const defaultOptions = [
-    { label: 'استفسار', value: 'as' },
-    { label: 'شكوى', value: 'sh' },
-    { label: 'طلب رتبة', value: 'kl' },
-    { label: 'شراء', value: 'sr' },
+    { label: 'استفسار', value: 'inquiry' },
+    { label: 'شكوى', value: 'complaint' },
+    { label: 'طلب رتبة', value: 'rank_request' },
+    { label: 'شراء', value: 'purchase' },
 ];
 
 const getOptions = id => cfg[id]?.ticketOptions || defaultOptions;
@@ -88,6 +88,13 @@ client.on('interactionCreate', async interaction => {
     if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_select') {
         const config = cfg[g];
         if (!config?.roleId) return interaction.reply({ content: '❌ شغل /setup-ticket أول', ephemeral: true });
+
+        const existing = [...tickets.values()].find(tk => tk.g === g && tk.owner === interaction.user.id);
+        if (existing) {
+            const ch = interaction.guild.channels.cache.get([...tickets.entries()].find(([_, v]) => v === existing)[0]);
+            return interaction.reply({ content: `❌ عندك تكت مفتوح بالفعل: ${ch ? ch : '#ticket-' + existing.num}`, ephemeral: true });
+        }
+
         const category = interaction.values[0];
         const label = getOptions(g).find(o => o.value === category)?.label || category;
         const userId = interaction.user.id;
