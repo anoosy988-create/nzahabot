@@ -466,36 +466,4 @@ client.on('interactionCreate', async (interaction) => {
 
     // معالجة Modal
     if (interaction.isModalSubmit() && interaction.customId === 'add_user_modal') {
-        const ticketData = ti 
-ckets.get(interaction.channel.id);
-        const userInput = interaction.fields.getTextInputValue('user_id');
-        const config = serverConfigs[ticketData.guildId];
-        let userId;
-        try {
-            if (userInput.startsWith('<@') && userInput.endsWith('>')) {
-                userId = userInput.replace(/[<@!>]/g, '');
-            } else if (!isNaN(userInput)) {
-                userId = userInput;
-            } else {
-                const members = await interaction.guild.members.search({ query: userInput, limit: 1 });
-                if (members.size === 0) return await interaction.reply({ content: '❌ لم يتم العثور على المستخدم', ephemeral: true });
-                userId = members.first()?.id;
-            }
-            const user = await client.users.fetch(userId);
-            if (ticketData.users.includes(userId)) return await interaction.reply({ content: '⚠️ هذا المستخدم مضاف بالفعل', ephemeral: true });
-            await interaction.channel.permissionOverwrites.create(userId, { ViewChannel: true, SendMessages: true, ReadMessageHistory: true });
-            ticketData.users.push(userId);
-            const embed = new EmbedBuilder().setTitle('✅ تم إضافة شخص').setDescription(`تم إضافة ${user.tag} للتكت`).setColor(0x00FF00);
-            await interaction.reply({ embeds: [embed] });
-            const dmEmbed = new EmbedBuilder().setTitle('📨 تمت إضافتك لتكت').setDescription(`تمت إضافتك لتكت\n**القناة:** ${interaction.channel.name}\n**المضيف:** ${interaction.user.tag}`).setColor(0x00FF00);
-            await user.send({ embeds: [dmEmbed] }).catch(console.error);
-            const channelEmbed = new EmbedBuilder().setTitle('👤 تم إضافة عضو جديد').setDescription(`تمت إضافة ${user.tag} للتكت بواسطة ${interaction.user.tag}`).setColor(0x00FF00);
-            await interaction.channel.send({ embeds: [channelEmbed] });
-        } catch (error) {
-            console.error(error);
-            await interaction.reply({ content: '❌ حدث خطأ أثناء إضافة المستخدم', ephemeral: true });
-        }
-    }
-});
-
-client.login(process.env.TOKEN);
+        const ticketData = ti
