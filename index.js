@@ -11,10 +11,10 @@ const tickets = new Map();
 const counters = {};
 
 const defaultOptions = [
-    { label: 'استفسار', value: 'inquiry' },
-    { label: 'شكوى', value: 'complaint' },
-    { label: 'طلب رتبة', value: 'rank_request' },
-    { label: 'شراء', value: 'purchase' },
+    { label: 'استفسار', value: '.' },
+    { label: 'شكوى', value: '.' },
+    { label: 'طلب رتبة', value: '.' },
+    { label: 'شراء', value: '.' },
 ];
 
 const getOptions = id => cfg[id]?.ticketOptions || defaultOptions;
