@@ -16,10 +16,11 @@ const tickets = new Map();
 const counters = {};
 
 const defaultOptions = [
-    { label: 'استفسار', value: 'استفسار' },
-    { label: 'شكوى', value: 'شكوى' },
-    { label: 'طلب رتبة', value: 'طلب_رتبة' },
-    { label: 'شراء', value: 'شراء' },
+    { label: 'نيتر9', value: 'نيتر9' },
+    { label: 'ب9ست', value: 'ب9ست' },
+    { label: 'كريدت', value: 'كريدت' },
+    { label: 'برمجه', value: 'برمجه' },
+    { label: 'طلب بوت', value: 'طلب بوت' },
 ];
 
 const PREFIX = '+';
