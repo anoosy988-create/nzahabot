@@ -12,6 +12,7 @@ const save = () => fs.writeFileSync(configFile, JSON.stringify(cfg, null, 2));
 const saveTickets = () => fs.writeFileSync(ticketsFile, JSON.stringify(ticketsData, null, 2));
 const isAdmin = m => m.permissions.has(PermissionsBitField.Flags.Administrator);
 
+// ✅ Map لتخزين التكتات في الذاكرة
 const tickets = new Map();
 const counters = {};
 
@@ -30,12 +31,27 @@ function generateValue(label) {
     return label.trim().replace(/\s+/g, '_');
 }
 
+// ✅ تحميل الكونترز من البيانات المحفوظة
+function loadCounters() {
+    Object.values(ticketsData).forEach(t => {
+        if (t.g && t.num) {
+            if (!counters[t.g]) counters[t.g] = 0;
+            if (t.num > counters[t.g]) counters[t.g] = t.num;
+        }
+    });
+}
+
 client.on('ready', async () => {
     console.log(`✅ ${client.user.tag} جاهز!`);
 
+    // ✅ تحميل التكتات القديمة من الملف إلى الـ Map
     Object.entries(ticketsData).forEach(([channelId, ticketData]) => {
         tickets.set(channelId, ticketData);
+        console.log(`📂 تم تحميل التكت: ${channelId} -> #${ticketData.num}`);
     });
+
+    // ✅ تحميل الكونترز
+    loadCounters();
 
     // ✅ تسجيل السلاش كوماندات
     await client.application.commands.set([
@@ -62,10 +78,10 @@ client.on('messageCreate', async msg => {
     // ✅ أمر +تعال - يدخل الشخص ويشوف الروم ويتكلم فيها
     if (command === 'تعال' || command === 'come') {
         const t = tickets.get(msg.channel.id);
-        if (!t) return msg.reply('❌ هذه مو قناة تكت');
+        if (!t) return msg.reply('❌ هذه ليست قناة تكت');
 
         if (msg.author.id !== t.owner && !isAdmin(msg.member)) {
-            return msg.reply('صاحب التكت أو أدمن بس');
+            return msg.reply('❌ صاحب التكت أو أدمن فقط');
         }
 
         const nameQuery = args.slice(1).join(' ');
@@ -97,6 +113,7 @@ client.on('messageCreate', async msg => {
             });
 
             t.users.push(user.id);
+            ticketsData[msg.channel.id] = t; // ✅ تحديث البيانات
             saveTickets();
 
             await msg.reply({
@@ -134,7 +151,6 @@ client.on('interactionCreate', async interaction => {
             return interaction.reply({ content: '✅ تم إنشاء اللوحة', ephemeral: true });
         }
 
-        // ✅ add-option يطلب label بس، والـ value يتولد تلقائياً
         if (interaction.commandName === 'add-option') {
             const label = interaction.options.getString('label');
             const value = generateValue(label);
@@ -147,7 +163,6 @@ client.on('interactionCreate', async interaction => {
             return interaction.reply({ content: `✅ تم إضافة **${label}**`, ephemeral: true });
         }
 
-        // ✅ remove-option يحذف بالـ label بدون ما يطلب value
         if (interaction.commandName === 'remove-option') {
             const label = interaction.options.getString('label');
             if (!cfg[g]?.ticketOptions) return interaction.reply({ content: '❌ ما في خيارات مخصصة', ephemeral: true });
@@ -210,7 +225,7 @@ client.on('interactionCreate', async interaction => {
 
         const ticketObj = { g, num, owner: userId, claimed: null, label, users: [userId] };
         tickets.set(channel.id, ticketObj);
-        ticketsData[channel.id] = ticketObj;
+        ticketsData[channel.id] = ticketObj; // ✅ حفظ في البيانات
         saveTickets();
 
         // ✅ أزرار: استلام + إغلاق + إضافة شخص
@@ -258,6 +273,7 @@ client.on('interactionCreate', async interaction => {
             if (!isAdmin(interaction.member)) return interaction.reply({ content: '❌ أدمن فقط', ephemeral: true });
             if (t.claimed) return interaction.reply({ content: `⚠️ مستلم من <@${t.claimed}>`, ephemeral: true });
             t.claimed = interaction.user.id;
+            ticketsData[interaction.channel.id] = t; // ✅ تحديث البيانات
             saveTickets();
             await interaction.reply({
                 embeds: [new EmbedBuilder()
@@ -265,7 +281,6 @@ client.on('interactionCreate', async interaction => {
                     .setDescription(`استلم التكت: ${interaction.user}`)
                     .setColor(0x0099FF)]
             });
-            // ❌ لا رسالة خاص للاستلام
         }
 
         else if (interaction.customId === 'close') {
@@ -278,7 +293,6 @@ client.on('interactionCreate', async interaction => {
                     .setColor(0xFF0000)]
             });
 
-            // ✅ رسالة خاص للإغلاق فقط
             await client.users.fetch(t.owner).then(u => u.send({
                 embeds: [new EmbedBuilder()
                     .setTitle('🔴 تم إغلاق تكتك')
@@ -337,7 +351,6 @@ client.on('interactionCreate', async interaction => {
             }
             if (t.users.includes(userId)) return interaction.reply({ content: '⚠️ مضاف مسبقاً', ephemeral: true });
             const user = await client.users.fetch(userId);
-            // ✅ صلاحيات بسيطة: يشوف + يتكلم + يقرأ السابق + يرسل صور
             await interaction.channel.permissionOverwrites.create(userId, { 
                 ViewChannel: true, 
                 SendMessages: true, 
@@ -345,6 +358,7 @@ client.on('interactionCreate', async interaction => {
                 AttachFiles: true
             });
             t.users.push(userId);
+            ticketsData[interaction.channel.id] = t; // ✅ تحديث البيانات
             saveTickets();
             await interaction.reply({
                 embeds: [new EmbedBuilder()
@@ -352,7 +366,6 @@ client.on('interactionCreate', async interaction => {
                     .setDescription(`تمت إضافة ${user.tag} للتكت`)
                     .setColor(0x00FF00)]
             });
-            // ❌ لا رسالة خاص للإضافة
         } catch (e) {
             console.error(e);
             await interaction.reply({ content: '❌ حدث خطأ', ephemeral: true });
