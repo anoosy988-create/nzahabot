@@ -12,7 +12,6 @@ const save = () => fs.writeFileSync(configFile, JSON.stringify(cfg, null, 2));
 const saveTickets = () => fs.writeFileSync(ticketsFile, JSON.stringify(ticketsData, null, 2));
 const isAdmin = m => m.permissions.has(PermissionsBitField.Flags.Administrator);
 
-// ✅ Map لتخزين التكتات في الذاكرة
 const tickets = new Map();
 const counters = {};
 
@@ -31,7 +30,6 @@ function generateValue(label) {
     return label.trim().replace(/\s+/g, '_');
 }
 
-// ✅ تحميل الكونترز من البيانات المحفوظة
 function loadCounters() {
     Object.values(ticketsData).forEach(t => {
         if (t.g && t.num) {
@@ -44,16 +42,12 @@ function loadCounters() {
 client.on('ready', async () => {
     console.log(`✅ ${client.user.tag} جاهز!`);
 
-    // ✅ تحميل التكتات القديمة من الملف إلى الـ Map
     Object.entries(ticketsData).forEach(([channelId, ticketData]) => {
         tickets.set(channelId, ticketData);
-        console.log(`📂 تم تحميل التكت: ${channelId} -> #${ticketData.num}`);
     });
 
-    // ✅ تحميل الكونترز
     loadCounters();
 
-    // ✅ تسجيل السلاش كوماندات
     await client.application.commands.set([
         new SlashCommandBuilder().setName('setup-ticket').setDescription('إعداد نظام التكتات')
             .addChannelOption(o => o.setName('logs').setDescription('قناة اللوقات').setRequired(true))
@@ -75,7 +69,6 @@ client.on('messageCreate', async msg => {
     const args = msg.content.slice(PREFIX.length).trim().split(/ +/);
     const command = args[0];
 
-    // ✅ أمر +تعال - يدخل الشخص ويشوف الروم ويتكلم فيها
     if (command === 'تعال' || command === 'come') {
         const t = tickets.get(msg.channel.id);
         if (!t) return msg.reply('❌ هذه ليست قناة تكت');
@@ -104,7 +97,6 @@ client.on('messageCreate', async msg => {
                 return msg.reply(`⚠️ <@${user.id}> موجود مسبقاً في التكت`);
             }
 
-            // ✅ صلاحيات بسيطة: يشوف + يتكلم + يقرأ السابق + يرسل صور
             await msg.channel.permissionOverwrites.create(user.id, {
                 ViewChannel: true,
                 SendMessages: true,
@@ -113,7 +105,7 @@ client.on('messageCreate', async msg => {
             });
 
             t.users.push(user.id);
-            ticketsData[msg.channel.id] = t; // ✅ تحديث البيانات
+            ticketsData[msg.channel.id] = t;
             saveTickets();
 
             await msg.reply({
@@ -163,14 +155,62 @@ client.on('interactionCreate', async interaction => {
             return interaction.reply({ content: `✅ تم إضافة **${label}**`, ephemeral: true });
         }
 
+        // ✅ إصلاح remove-option - يبحث في كل الخيارات ويحذف
         if (interaction.commandName === 'remove-option') {
             const label = interaction.options.getString('label');
-            if (!cfg[g]?.ticketOptions) return interaction.reply({ content: '❌ ما في خيارات مخصصة', ephemeral: true });
-            const before = cfg[g].ticketOptions.length;
-            cfg[g].ticketOptions = cfg[g].ticketOptions.filter(o => o.label !== label && o.value !== label);
-            if (cfg[g].ticketOptions.length === before) return interaction.reply({ content: '❌ الخيار غير موجود', ephemeral: true });
+            const value = generateValue(label);
+
+            // ✅ نجمع كل الخيارات (افتراضية + مخصصة)
+            const allOptions = [...defaultOptions];
+            if (cfg[g]?.ticketOptions) {
+                // نضيف المخصصة اللي مو موجودة في الافتراضية
+                cfg[g].ticketOptions.forEach(opt => {
+                    if (!allOptions.find(o => o.value === opt.value)) {
+                        allOptions.push(opt);
+                    }
+                });
+            }
+
+            // ✅ نبحث عن الخيار بالـ label أو الـ value
+            const optionToRemove = allOptions.find(o => o.label === label || o.value === value || o.value === label);
+
+            if (!optionToRemove) {
+                return interaction.reply({ content: `❌ الخيار "${label}" غير موجود`, ephemeral: true });
+            }
+
+            // ✅ لو الخيار من الافتراضية، نخزن الباقي في ticketOptions
+            const isDefault = defaultOptions.find(o => o.value === optionToRemove.value);
+
+            if (isDefault) {
+                // نحذف من الافتراضية ونخزن الباقي
+                if (!cfg[g]) cfg[g] = {};
+                if (!cfg[g].ticketOptions) {
+                    // نخزن كل الافتراضية ما عدا اللي نحذفه
+                    cfg[g].ticketOptions = defaultOptions.filter(o => o.value !== optionToRemove.value);
+                } else {
+                    // نحذف من المخصصة أيضاً
+                    cfg[g].ticketOptions = cfg[g].ticketOptions.filter(o => o.value !== optionToRemove.value);
+                    // نتأكد إن الافتراضية الباقية موجودة
+                    defaultOptions.forEach(defOpt => {
+                        if (defOpt.value !== optionToRemove.value && !cfg[g].ticketOptions.find(o => o.value === defOpt.value)) {
+                            cfg[g].ticketOptions.push(defOpt);
+                        }
+                    });
+                }
+            } else {
+                // نحذف من المخصصة فقط
+                if (cfg[g]?.ticketOptions) {
+                    cfg[g].ticketOptions = cfg[g].ticketOptions.filter(o => o.value !== optionToRemove.value);
+                }
+            }
+
+            // ✅ لو ticketOptions فاضية، نحذفها
+            if (cfg[g]?.ticketOptions && cfg[g].ticketOptions.length === 0) {
+                delete cfg[g].ticketOptions;
+            }
+
             save();
-            return interaction.reply({ content: `✅ تم حذف **${label}**`, ephemeral: true });
+            return interaction.reply({ content: `✅ تم حذف **${optionToRemove.label}**`, ephemeral: true });
         }
 
         if (interaction.commandName === 'list-options') {
@@ -225,10 +265,9 @@ client.on('interactionCreate', async interaction => {
 
         const ticketObj = { g, num, owner: userId, claimed: null, label, users: [userId] };
         tickets.set(channel.id, ticketObj);
-        ticketsData[channel.id] = ticketObj; // ✅ حفظ في البيانات
+        ticketsData[channel.id] = ticketObj;
         saveTickets();
 
-        // ✅ أزرار: استلام + إغلاق + إضافة شخص
         const btns = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('claim').setLabel('✋ استلام').setStyle(ButtonStyle.Primary),
             new ButtonBuilder().setCustomId('close').setLabel('🔴 إغلاق').setStyle(ButtonStyle.Danger),
@@ -273,7 +312,7 @@ client.on('interactionCreate', async interaction => {
             if (!isAdmin(interaction.member)) return interaction.reply({ content: '❌ أدمن فقط', ephemeral: true });
             if (t.claimed) return interaction.reply({ content: `⚠️ مستلم من <@${t.claimed}>`, ephemeral: true });
             t.claimed = interaction.user.id;
-            ticketsData[interaction.channel.id] = t; // ✅ تحديث البيانات
+            ticketsData[interaction.channel.id] = t;
             saveTickets();
             await interaction.reply({
                 embeds: [new EmbedBuilder()
@@ -358,7 +397,7 @@ client.on('interactionCreate', async interaction => {
                 AttachFiles: true
             });
             t.users.push(userId);
-            ticketsData[interaction.channel.id] = t; // ✅ تحديث البيانات
+            ticketsData[interaction.channel.id] = t;
             saveTickets();
             await interaction.reply({
                 embeds: [new EmbedBuilder()
