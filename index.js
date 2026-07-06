@@ -62,10 +62,10 @@ client.on('messageCreate', async msg => {
     // ✅ أمر +تعال - يدخل الشخص ويشوف الروم ويتكلم فيها
     if (command === 'تعال' || command === 'come') {
         const t = tickets.get(msg.channel.id);
-        if (!t) return msg.reply('❌ هذه ليست قناة تكت');
+        if (!t) return msg.reply('❌ هذه مو قناة تكت');
 
         if (msg.author.id !== t.owner && !isAdmin(msg.member)) {
-            return msg.reply('❌ صاحب التكت أو أدمن فقط');
+            return msg.reply('صاحب التكت أو أدمن بس');
         }
 
         const nameQuery = args.slice(1).join(' ');
